@@ -18,3 +18,4 @@ drivers-platform-x86-dell-s6000-s1220.patch
 drivers-i2c-busses-i2c-isch-probe-param.patch
 platform-accton-as5712_54x-device-drivers.patch
 driver-hwmon-cpr-4011-4mxx.patch
+platform-accton-as6712_32x-device-drivers.patch
