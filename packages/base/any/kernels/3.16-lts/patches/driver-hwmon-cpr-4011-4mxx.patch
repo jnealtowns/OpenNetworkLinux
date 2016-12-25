@@ -1,18 +1,3 @@
-diff -urpN a/drivers/hwmon/#Makefile.rej# b/drivers/hwmon/#Makefile.rej#
---- a/drivers/hwmon/#Makefile.rej#	1970-01-01 00:00:00.000000000 +0000
-+++ b/drivers/hwmon/#Makefile.rej#	2016-12-25 16:04:24.609783222 +0000
-@@ -0,0 +1,11 @@
-+--- drivers/hwmon/Makefile
-++++ drivers/hwmon/Makefile
-+@@ -42,3 +42,3 @@ obj-$(CONFIG_SENSORS_APPLESMC)	+= applesmc.o
-+ obj-$(CONFIG_SENSORS_ASC7621)	+= asc7621.o
-+ obj-$(CONFIG_SENSORS_ATXP1)	+= atxp1.o
-+ obj-$(CONFIG_SENSORS_CORETEMP)	+= coretemp.o
-+
-++obj-$(CONFIG_SENSORS_CPR_4011_4MXX) += cpr_4011_4mxx.o
-+ obj-$(CONFIG_SENSORS_CY8CXX)	+= cy8cxx.o
-+ obj-$(CONFIG_SENSORS_CY8C3245R1)	+= cy8c3245r1.o
-+ obj-$(CONFIG_SENSORS_DME1737)	+= dme1737.o
 diff -urpN a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
 --- a/drivers/hwmon/Kconfig	2016-12-25 16:02:40.873780971 +0000
 +++ b/drivers/hwmon/Kconfig	2016-12-25 16:03:49.225782454 +0000

@@ -1,3 +1,4 @@
+
 diff -urpN a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
 --- a/drivers/hwmon/Kconfig	2016-12-23 18:35:07.226229781 +0000
 +++ b/drivers/hwmon/Kconfig	2016-12-23 18:33:53.610228183 +0000
@@ -1798,20 +1799,6 @@ diff -urpN a/drivers/i2c/busses/i2c-ismt.c.orig b/drivers/i2c/busses/i2c-ismt.c.
 -MODULE_LICENSE("Dual BSD/GPL");
 -MODULE_AUTHOR("Bill E. Brown <bill.e.brown@intel.com>");
 -MODULE_DESCRIPTION("Intel SMBus Message Transport (iSMT) driver");
-diff -urpN a/drivers/i2c/muxes/#Makefile.rej# b/drivers/i2c/muxes/#Makefile.rej#
---- a/drivers/i2c/muxes/#Makefile.rej#	1970-01-01 00:00:00.000000000 +0000
-+++ b/drivers/i2c/muxes/#Makefile.rej#	2016-12-23 18:36:39.838231790 +0000
-@@ -0,0 +1,10 @@
-+--- drivers/i2c/muxes/Makefile
-++++ drivers/i2c/muxes/Makefile
-+@@ -6,6 +6,7 @@ obj-$(CONFIG_I2C_MUX_PCA9541)	+= pca9541.o
-+ obj-$(CONFIG_I2C_MUX_PCA954x)	+= pca954x.o
-+ obj-$(CONFIG_I2C_MUX_DNI_6448)	+= dni_6448_i2c_mux.o
-+ obj-$(CONFIG_I2C_MUX_QUANTA)	+= quanta-i2cmux.o
-+ obj-$(CONFIG_I2C_MUX_QUANTA_LY2)        += quanta-ly2-i2c-mux.o
-++obj-$(CONFIG_I2C_MUX_ACCTON_AS5712_54x_CPLD) += i2c-mux-accton_as5712_54x_cpld.o
-+ 
-+ ccflags-$(CONFIG_I2C_DEBUG_BUS) := -DDEBUG
 diff -urpN a/drivers/i2c/muxes/Kconfig b/drivers/i2c/muxes/Kconfig
 --- a/drivers/i2c/muxes/Kconfig	2016-11-20 01:17:41.000000000 +0000
 +++ b/drivers/i2c/muxes/Kconfig	2016-12-23 18:33:53.610228183 +0000
@@ -2312,21 +2299,6 @@ diff -urpN a/drivers/i2c/muxes/i2c-mux-accton_as5712_54x_cpld.c b/drivers/i2c/mu
 +module_exit(accton_i2c_cpld_mux_exit);
 +
 +
-diff -urpN a/drivers/leds/#Makefile.rej# b/drivers/leds/#Makefile.rej#
---- a/drivers/leds/#Makefile.rej#	1970-01-01 00:00:00.000000000 +0000
-+++ b/drivers/leds/#Makefile.rej#	2016-12-23 18:37:45.118233207 +0000
-@@ -0,0 +1,10 @@
-+--- drivers/leds/Makefile
-++++ drivers/leds/Makefile
-+@@ -43,6 +43,7 @@ obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
-+ obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
-+ obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
-+ obj-$(CONFIG_LEDS_RENESAS_TPU)		+= leds-renesas-tpu.o
-++obj-$(CONFIG_LEDS_ACCTON_AS5712_54x) += leds-accton_as5712_54x.o
-+ 
-+ # LED SPI Drivers
-+ obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
-diff -urpN a/drivers/leds/Kconfig b/drivers/leds/Kconfig
 --- a/drivers/leds/Kconfig	2016-11-20 01:17:41.000000000 +0000
 +++ b/drivers/leds/Kconfig	2016-12-23 18:33:53.610228183 +0000
 @@ -40,6 +40,13 @@ config LEDS_ATMEL_PWM
