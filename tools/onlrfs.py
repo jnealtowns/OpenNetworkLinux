@@ -368,7 +368,7 @@ class OnlRfsBuilder(object):
             onlu.execute("sudo rm -rf %s" % dir_,
                          ex=OnlRfsError("Could not remove target directory."))
 
-        if onlu.execute("sudo %s -d %s -f %s" % (self.MULTISTRAP, dir_, msconfig)) == 100:
+        if onlu.execute("sudo unshare -pf --mount-proc %s -d %s -f %s" % (self.MULTISTRAP, dir_, msconfig)) == 100:
             raise OnlRfsError("Multistrap APT failure.")
 
         if os.getenv("MULTISTRAP_DEBUG"):
@@ -386,11 +386,12 @@ class OnlRfsBuilder(object):
         onlu.execute('sudo cp %s %s' % (os.path.join(os.getenv('ONL'), 'tools', 'scripts', 'base-files.postinst'),
                                         os.path.join(dir_, 'var', 'lib', 'dpkg', 'info', 'base-files.postinst')));
 
+        # make sure /tmp is writable
+        OnlRfsSystemAdmin.chmod('1777', '%s/tmp' % dir_)
         script = os.path.join(dir_, "tmp/configure.sh")
         with open(script, "w") as f:
             os.chmod(script, 0700)
-            f.write("""
-#!/bin/bash -ex
+            f.write("""#!/bin/bash -ex
 /bin/echo -e "#!/bin/sh\\nexit 101" >/usr/sbin/policy-rc.d
 chmod +x /usr/sbin/policy-rc.d
 export DEBIAN_FRONTEND=noninteractive
@@ -415,7 +416,7 @@ rm -f /usr/sbin/policy-rc.d
 
         logger.info("dpkg-configure filesystem...")
 
-        onlu.execute("sudo chroot %s /tmp/configure.sh" % dir_,
+        onlu.execute("sudo unshare -pf --mount-proc chroot %s /tmp/configure.sh" % dir_,
                      ex=OnlRfsError("Post Configuration failed."))
         os.unlink(script)
 
@@ -424,7 +425,7 @@ rm -f /usr/sbin/policy-rc.d
     def configure(self, dir_):
 
         if not os.getenv('NO_DPKG_CONFIGURE'):
-            with OnlRfsContext(dir_, resolvconf=False):
+            with OnlRfsContext(dir_):
                 self.dpkg_configure(dir_)
 
         with OnlRfsContext(dir_):
@@ -458,7 +459,7 @@ rm -f /usr/sbin/policy-rc.d
 
                 for script in Configure.get('scripts', []):
                     logger.info("Configuration script %s..." % script)
-                    onlu.execute("sudo %s %s" % (script, dir_),
+                    onlu.execute("sudo -E unshare -pf --mount-proc %s %s" % (script, dir_),
                                  ex=OnlRfsError("script '%s' failed." % script))
 
 
@@ -729,7 +730,7 @@ if __name__ == '__main__':
         if not ops.no_multistrap and not os.getenv('NO_MULTISTRAP'):
             x.multistrap(ops.dir)
 
-        if not ops.no_configure and not os.getenv('NO_DPKG_CONFIGURE'):
+        if not ops.no_configure and not os.getenv('NO_CONFIGURE'):
             x.configure(ops.dir)
 
         if ops.update:
