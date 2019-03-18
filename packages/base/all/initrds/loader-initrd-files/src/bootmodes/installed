@@ -72,7 +72,9 @@ sed -i -e '/^SWI=/d' /etc/onl/BOOTPARAMS
 echo "SWI=dir:data:/" >> /etc/onl/BOOTPARAMS
 
 if [ "$do_unpack" ]; then
+    echo "This unpack may take a few minutes. The system will reboot when the operation is complete."
     swiprep --install "$swipath" --swiref "$swistamp" /mnt/onl/data
+    reboot
 fi
 swiprep --record "$swipath" --swiref "$swistamp" /mnt/onl/data
 
