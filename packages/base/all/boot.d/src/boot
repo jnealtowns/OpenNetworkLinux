@@ -11,9 +11,13 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 export PATH
 
+echo "Updating module database..."
+depmod -a
+
 for script in `ls /etc/boot.d/[0-9]* | sort`; do
     $script
 done
+
 
 #
 # Wait for console to flush prior to starting rc.S
