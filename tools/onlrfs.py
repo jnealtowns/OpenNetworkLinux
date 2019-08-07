@@ -29,6 +29,11 @@ import json
 
 logger = onlu.init_logging('onlrfs')
 
+def onlu_execute_sudo(*args, **kwargs):
+    kwargs = dict(kwargs)
+    kwargs['sudo'] = True
+    return onlu.execute(*args, **kwargs)
+
 class OnlRfsError(Exception):
     """General Error Exception"""
     def __init__(self, value):
@@ -58,13 +63,13 @@ class OnlRfsSystemAdmin(object):
 
     @staticmethod
     def chmod(mode, file_):
-        onlu.execute("sudo chmod %s %s" % (mode, file_),
-                     ex=OnlRfsError("Could not change permissions (%s) on file %s" % (mode, file_)))
+        onlu_execute_sudo("chmod %s %s" % (mode, file_),
+                          ex=OnlRfsError("Could not change permissions (%s) on file %s" % (mode, file_)))
 
     @staticmethod
     def chown(file_, ownspec):
-        onlu.execute("sudo chown %s %s" % (ownspec, file_),
-                     ex=OnlRfsError("Could not change ownership (%s) on file %s" % (ownspec, file_)))
+        onlu_execute_sudo("chown %s %s" % (ownspec, file_),
+                          ex=OnlRfsError("Could not change ownership (%s) on file %s" % (ownspec, file_)))
 
     def userdel(self, username):
         pf = os.path.join(self.chroot, 'etc/passwd')
@@ -268,18 +273,18 @@ class OnlRfsContext(object):
 
     def __enter__(self):
         try:
-            onlu.execute("sudo mount -t devtmpfs dev %s" % self.dev,
-                         ex=OnlRfsError("Could not mount dev in rfs."))
-            onlu.execute("sudo mount -t proc proc %s" % self.proc,
-                         ex=OnlRfsError("Could not mount proc in rfs."))
+            onlu_execute_sudo("mount -t devtmpfs dev %s" % self.dev,
+                              ex=OnlRfsError("Could not mount dev in rfs."))
+            onlu_execute_sudo("mount -t proc proc %s" % self.proc,
+                              ex=OnlRfsError("Could not mount proc in rfs."))
 
             if self.rc:
                 if self.exists(self.resolvconf):
-                    onlu.execute("sudo mv %s %s" % (self.resolvconf, self.resolvconfb),
-                                 ex=OnlRfsError("Could not backup resolv.conf"))
+                    onlu_execute_sudo("mv %s %s" % (self.resolvconf, self.resolvconfb),
+                                      ex=OnlRfsError("Could not backup resolv.conf"))
 
-                onlu.execute("sudo cp --remove-destination /etc/resolv.conf %s" % (self.resolvconf),
-                             ex=OnlRfsError("Could install new resolv.conf"))
+                onlu_execute_sudo("cp --remove-destination /etc/resolv.conf %s" % (self.resolvconf),
+                                  ex=OnlRfsError("Could install new resolv.conf"))
             return self
 
         except Exception, e:
@@ -288,15 +293,15 @@ class OnlRfsContext(object):
             raise e
 
     def __exit__(self, eType, eValue, eTrace):
-        onlu.execute("sudo umount -l %s %s" % (self.dev, self.proc),
-                     ex=OnlRfsError("Could not unmount dev and proc"))
+        onlu_execute_sudo("umount -l %s %s" % (self.dev, self.proc),
+                          ex=OnlRfsError("Could not unmount dev and proc"))
 
         if self.rc:
-            onlu.execute("sudo rm %s" % (self.resolvconf),
-                         ex=OnlRfsError("Could not remove new resolv.conf"))
+            onlu_execute_sudo("rm %s" % (self.resolvconf),
+                              ex=OnlRfsError("Could not remove new resolv.conf"))
             if self.exists(self.resolvconfb):
-                onlu.execute("sudo mv %s %s" % (self.resolvconfb, self.resolvconf),
-                             ex=OnlRfsError("Could not restore resolv.conf"))
+                onlu_execute_sudo("mv %s %s" % (self.resolvconfb, self.resolvconf),
+                                  ex=OnlRfsError("Could not restore resolv.conf"))
 
 class OnlRfsBuilder(object):
 
@@ -316,6 +321,12 @@ class OnlRfsBuilder(object):
         self.kwargs = kwargs
         self.arch = arch
         self.kwargs['ARCH'] = arch
+
+        # Hack -- we have to pull powerpc from the archive
+        # This will need a cleaner fix.
+        if arch == 'powerpc':
+            self.DEFAULTS['DEBIAN_MIRROR'] = 'archive.debian.org/debian/'
+
         self.kwargs.update(self.DEFAULTS)
         self.__load(config)
         self.__validate()
@@ -365,10 +376,10 @@ class OnlRfsBuilder(object):
                     onlu.execute("make -C %s" % r)
 
         if os.path.exists(dir_):
-            onlu.execute("sudo rm -rf %s" % dir_,
-                         ex=OnlRfsError("Could not remove target directory."))
+            onlu_execute_sudo("rm -rf %s" % dir_,
+                              ex=OnlRfsError("Could not remove target directory."))
 
-        if onlu.execute("sudo %s -d %s -f %s" % (self.MULTISTRAP, dir_, msconfig)) == 100:
+        if onlu_execute_sudo("unshare -pf --mount-proc %s -d %s -f %s" % (self.MULTISTRAP, dir_, msconfig)) == 100:
             raise OnlRfsError("Multistrap APT failure.")
 
         if os.getenv("MULTISTRAP_DEBUG"):
@@ -386,6 +397,8 @@ class OnlRfsBuilder(object):
         onlu.execute('sudo cp %s %s' % (os.path.join(os.getenv('ONL'), 'tools', 'scripts', 'base-files.postinst'),
                                         os.path.join(dir_, 'var', 'lib', 'dpkg', 'info', 'base-files.postinst')));
 
+        # make sure /tmp is writable
+        OnlRfsSystemAdmin.chmod('1777', '%s/tmp' % dir_)
         script = os.path.join(dir_, "tmp/configure.sh")
         with open(script, "w") as f:
             os.chmod(script, 0700)
@@ -414,8 +427,8 @@ rm -f /usr/sbin/policy-rc.d
 
         logger.info("dpkg-configure filesystem...")
 
-        onlu.execute("sudo chroot %s /tmp/configure.sh" % dir_,
-                     ex=OnlRfsError("Post Configuration failed."))
+        onlu_execute_sudo("unshare -pf --mount-proc chroot %s /tmp/configure.sh" % dir_,
+                          ex=OnlRfsError("Post Configuration failed."))
         os.unlink(script)
 
 
@@ -423,7 +436,7 @@ rm -f /usr/sbin/policy-rc.d
     def configure(self, dir_):
 
         if not os.getenv('NO_DPKG_CONFIGURE'):
-            with OnlRfsContext(dir_, resolvconf=False):
+            with OnlRfsContext(dir_):
                 self.dpkg_configure(dir_)
 
         with OnlRfsContext(dir_):
@@ -444,8 +457,9 @@ rm -f /usr/sbin/policy-rc.d
             if Configure:
 
                 for cmd in Configure.get('run', []):
-                    onlu.execute("sudo chroot %s %s" % (dir_, cmd),
-                                 ex=OnlRfsError("run command '%s' failed" % cmd))
+                    onlu_execute_sudo(cmd,
+                                      ex=OnlRfsError("run command '%s' failed" % cmd),
+                                      chroot=dir_)
 
                 for overlay in Configure.get('overlays', []):
                     logger.info("Overlay %s..." % overlay)
@@ -453,13 +467,15 @@ rm -f /usr/sbin/policy-rc.d
                                  ex=OnlRfsError("Overlay '%s' failed." % overlay))
 
                 for update in Configure.get('update-rc.d', []):
-                    onlu.execute("sudo chroot %s /usr/sbin/update-rc.d %s" % (dir_, update),
-                                 ex=OnlRfsError("update-rc.d %s failed." % (update)))
+                    onlu_execute_sudo("/usr/sbin/update-rc.d %s" % update,
+                                      ex=OnlRfsError("update-rc.d %s failed." % (update)),
+                                      chroot=dir_)
 
                 for script in Configure.get('scripts', []):
                     logger.info("Configuration script %s..." % script)
-                    onlu.execute("sudo %s %s" % (script, dir_),
-                                 ex=OnlRfsError("script '%s' failed." % script))
+                    onlu_execute_sudo("unshare -pf --mount-proc %s %s" % (script, dir_),
+                                      ex=OnlRfsError("script '%s' failed." % script),
+                                      env=True)
 
 
                 for command in Configure.get('commands', []):
@@ -511,29 +527,30 @@ rm -f /usr/sbin/policy-rc.d
                         onlu.execute('sudo rm %s' % f,
                                      ex=OnlRfsError('Could not remove file %s' % f))
 
-                if not options.get('ttys', False):
-                    f = os.path.join(dir_, 'etc/inittab')
-                    ua.chmod('a+w', f)
-                    ua.chmod('a+w', os.path.dirname(f))
+                if os.path.exists(os.path.join(dir_, 'etc/inittab')):
+                    if not options.get('ttys', False):
+                        f = os.path.join(dir_, 'etc/inittab')
+                        ua.chmod('a+w', f)
+                        ua.chmod('a+w', os.path.dirname(f))
 
-                    logger.info("Clearing %s ttys..." % f)
-                    for line in fileinput.input(f, inplace=True):
-                        if re.match("^[123456]:.*", line):
-                           line = "#" + line
-                        print line,
+                        logger.info("Clearing %s ttys..." % f)
+                        for line in fileinput.input(f, inplace=True):
+                            if re.match("^[123456]:.*", line):
+                               line = "#" + line
+                            print line,
 
-                    ua.chmod('go-w', f)
-                    ua.chmod('go-w', os.path.dirname(f))
+                        ua.chmod('go-w', f)
+                        ua.chmod('go-w', os.path.dirname(f))
 
-                if options.get('console', True):
-                    logger.info('Configuring Console Access in %s' % f)
-                    f = os.path.join(dir_, 'etc/inittab')
-                    ua.chmod('a+w', f)
-                    ua.chmod('a+w', os.path.dirname(f))
-                    with open(f, 'a') as h:
-                        h.write("T0:23:respawn:/sbin/pgetty\n")
-                    ua.chmod('go-w', f)
-                    ua.chmod('go-w', os.path.dirname(f))
+                    if options.get('console', True):
+                        logger.info('Configuring Console Access in %s' % f)
+                        f = os.path.join(dir_, 'etc/inittab')
+                        ua.chmod('a+w', f)
+                        ua.chmod('a+w', os.path.dirname(f))
+                        with open(f, 'a') as h:
+                            h.write("T0:23:respawn:/sbin/pgetty\n")
+                        ua.chmod('go-w', f)
+                        ua.chmod('go-w', os.path.dirname(f))
 
                 if options.get('asr', None):
                     asropts = options.get('asr')
@@ -551,9 +568,9 @@ rm -f /usr/sbin/policy-rc.d
                     if mf.startswith('/'):
                         mf = mf[1:]
                     mname = os.path.join(dir_, mf)
-                    onlu.execute("sudo mkdir -p %s" % os.path.dirname(mname))
-                    onlu.execute("sudo touch %s" % mname)
-                    onlu.execute("sudo chmod a+w %s" % mname)
+                    onlu_execute_sudo("mkdir -p %s" % os.path.dirname(mname))
+                    onlu_execute_sudo("touch %s" % mname)
+                    onlu_execute_sudo("chmod a+w %s" % mname)
                     md = {}
                     md['version'] = json.load(open(fields['version']))
                     md['arch'] = self.arch
@@ -572,15 +589,15 @@ rm -f /usr/sbin/policy-rc.d
 
                     with open(mname, "w") as f:
                         json.dump(md, f, indent=2)
-                    onlu.execute("sudo chmod a-w %s" % mname)
+                    onlu_execute_sudo("chmod a-w %s" % mname)
 
                 for (fname, v) in Configure.get('files', {}).get('add', {}).iteritems():
                     if fname.startswith('/'):
                         fname = fname[1:]
                     dst = os.path.join(dir_, fname)
-                    onlu.execute("sudo mkdir -p %s" % os.path.dirname(dst))
-                    onlu.execute("sudo touch %s" % dst)
-                    onlu.execute("sudo chmod a+w %s" % dst)
+                    onlu_execute_sudo("mkdir -p %s" % os.path.dirname(dst))
+                    onlu_execute_sudo("touch %s" % dst)
+                    onlu_execute_sudo("chmod a+w %s" % dst)
                     if os.path.exists(v):
                         shutil.copy(v, dst)
                     else:
@@ -592,21 +609,21 @@ rm -f /usr/sbin/policy-rc.d
                         fname = fname[1:]
                     f = os.path.join(dir_, fname)
                     if os.path.exists(f):
-                        onlu.execute("sudo rm -rf %s" % f)
+                        onlu_execute_sudo("rm -rf %s" % f)
 
                 if Configure.get('issue'):
                     issue = Configure.get('issue')
                     fn = os.path.join(dir_, "etc/issue")
-                    onlu.execute("sudo chmod a+w %s" % fn)
+                    onlu_execute_sudo("chmod a+w %s" % fn)
                     with open(fn, "w") as f:
                         f.write("%s\n\n" % issue)
-                    onlu.execute("sudo chmod a-w %s" % fn)
+                    onlu_execute_sudo("chmod a-w %s" % fn)
 
                     fn = os.path.join(dir_, "etc/issue.net")
-                    onlu.execute("sudo chmod a+w %s" % fn)
+                    onlu_execute_sudo("chmod a+w %s" % fn)
                     with open(fn, "w") as f:
                         f.write("%s\n" % issue)
-                    onlu.execute("sudo chmod a-w %s" % fn)
+                    onlu_execute_sudo("chmod a-w %s" % fn)
 
 
     def update(self, dir_, packages):
@@ -732,7 +749,7 @@ if __name__ == '__main__':
         if not ops.no_multistrap and not os.getenv('NO_MULTISTRAP'):
             x.multistrap(ops.dir)
 
-        if not ops.no_configure and not os.getenv('NO_DPKG_CONFIGURE'):
+        if not ops.no_configure and not os.getenv('NO_CONFIGURE'):
             x.configure(ops.dir)
 
         if ops.update:
@@ -748,7 +765,7 @@ if __name__ == '__main__':
         if ops.squash:
             if os.path.exists(ops.squash):
                 os.unlink(ops.squash)
-            if onlu.execute("sudo mksquashfs %s %s -no-progress -noappend -comp gzip" % (ops.dir, ops.squash)) != 0:
+            if onlu_execute_sudo("mksquashfs %s %s -no-progress -noappend -comp gzip" % (ops.dir, ops.squash)) != 0:
                 if os.path.exists(ops.squash):
                     os.unlink(ops.squash)
                 raise OnlRfsError("Squash creation failed.")

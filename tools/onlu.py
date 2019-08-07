@@ -89,11 +89,11 @@ class Profiler(object):
 #
 # Log and execute system commands
 #
-def execute(args, sudo=False, chroot=None, ex=None):
+def execute(args, sudo=False, chroot=None, ex=None, env=False):
 
-    if type(args) is str:
+    if isinstance(args, basestring):
         # Must be executed through the shell
-        shell=True
+        shell = True
     else:
         shell = False
 
@@ -102,16 +102,22 @@ def execute(args, sudo=False, chroot=None, ex=None):
         sudo = True
 
     if chroot:
-        if type(args) is str:
+        if isinstance(args, basestring):
             args = "chroot %s %s" % (chroot, args)
         elif type(args) in (list,tuple):
             args = ['chroot', chroot] + list(args)
 
     if sudo:
-        if type(args) is str:
-            args = "sudo %s" % (args)
+        if isinstance(args, basestring):
+            if env:
+                args = "sudo -E %s" % (args)
+            else:
+                args = "sudo %s" % (args)
         elif type(args) in (list, tuple):
-            args = [ 'sudo' ] + list(args)
+            if env:
+                args = [ 'sudo', '-E', ] + list(args)
+            else:
+                args = [ 'sudo' ] + list(args)
 
 
     logger.debug("Executing:%s", args)
@@ -199,13 +205,13 @@ class Lock(object):
         self.handle = open(filename, 'w')
 
     def take(self):
-        # logger.debug("taking lock %s" % self.filename)
+        logger.debug("taking lock %s" % self.filename)
         fcntl.flock(self.handle, fcntl.LOCK_EX)
-        # logger.debug("took lock %s" % self.filename)
+        logger.debug("took lock %s" % self.filename)
 
     def give(self):
         fcntl.flock(self.handle, fcntl.LOCK_UN)
-        # logger.debug("released lock %s" % self.filename)
+        logger.debug("released lock %s" % self.filename)
 
     def __enter__(self):
         self.take()
